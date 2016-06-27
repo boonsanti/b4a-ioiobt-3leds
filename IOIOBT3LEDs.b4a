@@ -1,0 +1,193 @@
+﻿Version=3
+IconFile=
+NumberOfModules=0
+Package=com.expertqit.ioiobt3leds
+DoNotOverwriteManifest=False
+ManifestCode='This code will be applied to the manifest file during compilation.~\n~'You do not need to modify it in most cases.~\n~'See this link for for more information: http://www.basic4ppc.com/forum/showthread.php?p=78136~\n~AddManifestText(~\n~<uses-sdk android:minSdkVersion="4" android:targetSdkVersion="14"/>~\n~<supports-screens android:largeScreens="true" ~\n~    android:normalScreens="true" ~\n~    android:smallScreens="true" ~\n~    android:anyDensity="true"/>)~\n~SetApplicationAttribute(android:icon, "@drawable/icon")~\n~SetApplicationAttribute(android:label, "$LABEL$")~\n~'End of default text.~\n~ AddPermission(android.permission.BLUETOOTH)
+UserTypesHint=
+NumberOfFiles=1
+File1=Main.bal
+NumberOfLibraries=3
+Library1=core
+Library2=ioiobt
+Library3=ioiolibbt
+@EndOfDesignText@
+#Region  Project Attributes 
+	#ApplicationLabel: IOIOBT3LEDs
+	#VersionCode: 1
+	#VersionName: 
+	'SupportedOrientations possible values: unspecified, landscape or portrait.
+	#SupportedOrientations: unspecified
+	#CanInstallToExternalStorage: False
+#End Region
+
+#Region  Activity Attributes 
+	#FullScreen: False
+	#IncludeTitle: True
+#End Region
+
+Sub Process_Globals
+	'These global variables will be declared once when the application starts.
+	'These variables can be accessed from all modules.
+	Dim YOYO As IOIOBT
+	Dim ledStatus As DigitalOutput
+	Dim analogIn As AnalogInput
+	Dim pinSw As DigitalInput
+	Dim pinRed As PwmOutput
+	Dim pinGreen As PwmOutput
+	Dim pinBlue As PwmOutput
+	Dim boolConnected As Boolean
+	Dim iState As Int
+	Dim timCheckSw As Timer
+End Sub
+
+Sub Globals
+	'These global variables will be redeclared each time the activity is created.
+	'These variables can only be accessed from this module.
+
+	Dim skbBlue As SeekBar
+	Dim skbGreen As SeekBar
+	Dim skbRed As SeekBar
+	Dim lblBlue As Label
+	Dim lblGreen As Label
+	Dim lblRed As Label
+	Dim lblState As Label
+End Sub
+
+Sub Activity_Create(FirstTime As Boolean)
+	'Do not forget to load the layout file created with the visual designer. For example:
+	iState = 0
+	Activity.LoadLayout("Main")
+	boolConnected = False
+	IOIOConnect
+	skbRed.Value = 0
+	skbGreen.Value = 0
+	skbBlue.Value = 0
+	timCheckSw.Initialize("TimerCheckSw", 100)
+	timCheckSw.Interval = 100
+	timCheckSw.Enabled = True
+End Sub
+
+Sub Activity_Resume
+
+End Sub
+
+Sub Activity_Pause (UserClosed As Boolean)
+	If UserClosed = True Then
+		IOIODisconnect
+	End If
+End Sub
+
+
+Sub IOIOConnect
+	Try
+		YOYO.Initialize(True)
+		YOYO.WaitForConnect()
+		pinRed = YOYO.OpenPwmOutput(47, pinRed.OP_NORMAL,100)
+		pinRed.DutyCycle = 0.0
+		pinGreen = YOYO.OpenPwmOutput(48, pinGreen.OP_NORMAL,100)
+		pinGreen.DutyCycle = 0.0
+		pinBlue = YOYO.OpenPwmOutput(46, pinBlue.OP_NORMAL,100)
+		pinBlue.DutyCycle = 0.0
+		ledStatus = YOYO.OpenDigitalOutput(0, ledStatus.OP_NORMAL, False)
+		analogIn = YOYO.OpenAnalogInput(31)
+		pinSw = YOYO.OpenDigitalInput(20, pinSw.IP_PULL_UP)
+		boolConnected = True
+	Catch
+		Log(LastException.Message)
+	End Try
+End Sub
+
+Sub IOIODisconnect
+	Try
+		pinRed.Close
+		pinGreen.Close
+		pinBlue.Close
+		ledStatus.Close
+		YOYO.disconnect()
+		YOYO.WaitForDisconnect()
+		boolConnected = False
+	Catch
+		Log(LastException.Message)
+	End Try
+End Sub
+
+Sub skbRed_ValueChanged (Value As Int, UserChanged As Boolean)
+	lblRed.Text = "Red " & Value & " %"
+	Try
+		pinRed.DutyCycle = (100 - Value) / 100.0
+	Catch
+		Log(LastException.Message)
+		boolConnected = False
+	End Try
+End Sub
+Sub skbGreen_ValueChanged (Value As Int, UserChanged As Boolean)
+	lblGreen.Text = "Green " & Value & " %"
+	Try
+		pinGreen.DutyCycle = (100 - Value) / 100.0
+	Catch
+		Log(LastException.Message)
+		boolConnected = False
+	End Try
+End Sub
+Sub skbBlue_ValueChanged (Value As Int, UserChanged As Boolean)
+	lblBlue.Text = "Blue " & Value & " %"
+	Try
+		pinBlue.DutyCycle = (100 - Value) / 100.0
+	Catch
+		Log(LastException.Message)
+		boolConnected = False
+	End Try
+End Sub
+
+Sub TimerCheckSw_Tick
+	If boolConnected = True Then
+		Try
+			If pinSw.Read = False Then
+				Do While pinSw.Read = False
+					DoEvents
+				Loop
+				iState = iState + 1
+				If iState > 3 Then
+					iState = 0
+				End If
+			End If
+			Select iState
+				Case 1
+					lblState.TextColor = Colors.Red
+					lblState.Text =  NumberFormat(analogIn.Read() * 100,0,0) & "%"
+					skbRed.Value = NumberFormat(analogIn.Read() * 100,0,0)
+					skbRed.Enabled = False
+					skbGreen.Enabled = True
+					skbBlue.Enabled = True
+				Case 2
+					lblState.TextColor = Colors.Green
+					lblState.Text =  NumberFormat(analogIn.Read() * 100,0,0) & "%"
+					skbGreen.Value = NumberFormat(analogIn.Read() * 100,0,0)
+					skbRed.Enabled = True
+					skbGreen.Enabled = False
+					skbBlue.Enabled = True
+				Case 3
+					lblState.TextColor = Colors.Blue
+					lblState.Text =  NumberFormat(analogIn.Read() * 100,0,0) & "%"
+					skbBlue.Value = NumberFormat(analogIn.Read() * 100,0,0)
+					
+					skbRed.Enabled = True
+					skbGreen.Enabled = True
+					skbBlue.Enabled = False
+				Case Else
+					lblState.TextColor = Colors.Transparent
+					lblState.Text = ""
+					skbRed.Enabled = True
+					skbGreen.Enabled = True
+					skbBlue.Enabled = True
+			End Select
+			DoEvents
+		Catch
+			Log(LastException.Message)
+			boolConnected = False
+		End Try
+	Else
+		IOIOConnect	
+	End If
+End Sub
